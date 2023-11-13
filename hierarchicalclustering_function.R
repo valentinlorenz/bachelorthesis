@@ -38,15 +38,16 @@ load_packages = function(){
     library(NbClust)
     library(dplyr)
     library(fmsb)
+    library(sf)
 
 }
 load_data = function(){
-    dir.datos="D:/RStudio"
+    dir.datos="C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit"
     setwd(dir.datos)
 
     #Leemos tabla de variables
-    variables_shp<-readOGR("D:/RStudio/urban_extent_final/data_shp.shp") #IMP.: si volvemos a hacer los análisis con "nuevaBD_tfse_R_reord", tenemos que quitar [,2:30] del script (eso lo usabamos para quitar del análisis la columna con el nombre de los municipios).
-    variables <- as.data.frame(variables_shp@data)
+    variables<-read_sf("./RStudio/urban_extent_final/data_shp.shp") #IMP.: si volvemos a hacer los análisis con "nuevaBD_tfse_R_reord", tenemos que quitar [,2:30] del script (eso lo usabamos para quitar del análisis la columna con el nombre de los municipios).
+    variables <- as.data.frame(variables)
     return(variables)
     
     str(variables)
@@ -202,7 +203,7 @@ means_columns = function(var_df){
   
   return(means)
 }
-means_table = function(vars_df, cluster_results){
+means_table = function(vars_df, cluster_results, cluster_n){
   
   clustmeans <- means_clusters(vars_df, cluster_results)
   colmeans <- means_columns(vars_df)
@@ -218,18 +219,25 @@ means_table = function(vars_df, cluster_results){
   return(means_difference)
 }
 
-export_shp = function(hra_results, filename, shapefile){
+export_shp = function(hra_results, filename, shapefile, filepath){
+  
+  hra_results = hca_final_7[[4]]
+  filename = "test_shp"
+  shapefile = vars_shp
+  filepath = "."
   
   df <- as.data.frame(hra_results)
   df$ID_1 <- shapefile$ID_1
   
   shp <- cbind(shapefile, df, by="ID")
-  shp <- shp[1:length(df)-2]
+  shp <- shp[ , -which(names(shp) %in% c("by","ID_1.1"))]
   
-  writeOGR(obj=shp, dsn="./urban_extent_final", layer=filename, driver="ESRI Shapefile", overwrite=TRUE)
+  st_write(obj=shp, dsn=filepath, layer=filename, driver="ESRI Shapefile", overwrite=TRUE)
   
   return(shp)
 }
+
+export_shp(hra_results, filename, shapefile, filepath)
 
 #### LOAD DATA ####
 
@@ -444,12 +452,14 @@ export_shp(hca_10[[4]], "testclustern_10", vars_clip_urban_shp)
 
 #### Final Extent ####
 variables_urban_4 <- load_data()
+variables_urban_4 <- variables_urban_4[1:31]
 
 distance_method <- "manhattan"
 cluster_method <- "ward.D"
-vars_shp <- readOGR("./urban_extent_final/data_shp.shp")
+vars_shp <- read_sf("./RStudio/urban_extent_final/data_shp.shp")
 
 hca_final_7 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 7)
+rf <- random_forest(variables_urban_4, hca_final_7[[1]])
 shp7 <- export_shp(hca_final_7[[4]], "hca_manhattan_7", vars_shp)
 
 hca_final_8 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 8)
@@ -458,10 +468,9 @@ shp8 <- export_shp(hca_final_8[[4]], "hca_manhattan_8", vars_shp)
 hca_final_9 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 9)
 shp9 <- export_shp(hca_final_9[[4]], "hca_manhattan_9", vars_shp)
 
-
-means_7 <- means_table(variables_urban_4, hca_final_7[[1]])
-means_8 <- means_table(variables_urban_4, hca_final_8[[1]])
-means_9 <- means_table(variables_urban_4, hca_final_9[[1]])
+means_7 <- means_table(variables_urban_4, hca_final_7[[1]], 7)
+means_8 <- means_table(variables_urban_4, hca_final_8[[1]], 8)
+means_9 <- means_table(variables_urban_4, hca_final_9[[1]], 9)
 
 
 spplot(shp7, n = 7, col.regions = brewer.pal(n=7, name="Set1"), cuts = 6, 'hra_results', main="Clusters: 7", col="transparent")
@@ -523,8 +532,6 @@ table_sd <- function(vars, means){
   
   return(results)
 }
-
-
 table_sd_values <- function(vars, means){
   results <- data.frame(matrix(ncol = ncol(means), nrow=nrow(means)))
   colnames(results) <- names(means)
@@ -548,10 +555,13 @@ table_sd_values <- function(vars, means){
 #### plot data ####
 
 
-names <- colnames(vars_shp@data[2:31])
+plot <- vars_shp[2:32]
+plot(plot, key.pos = 4)
+
+### old plotting
 
 for (i in 2:31){
-  png(paste(filename="D:/plots/", i, ".png"))
+  png(paste(filename="./plots_new/", i, ".png"))
   print(spplot(vars_shp, zcol=i, main=names[[i-1]]))
   dev.off()
 }

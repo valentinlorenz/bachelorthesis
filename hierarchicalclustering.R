@@ -1,31 +1,35 @@
-###Análisis de correlación variables TFSEs###
+####Correlation####
 
-##Directorio de trabajo
-dir.datos="C:/Users/MANU/Google Drive/TESIS/Manu_Tesis_Doctoral/Capitulo_2/analisisR_TFSE/Cluster_nuevaBD/TFSE/10TFSE_manhattan_29var/Final_var_reord"
+##File directory
+dir.datos="D:/RStudio"
 
 setwd(dir.datos)
 
 #Leemos tabla de variables
-variablesTFSE<-read.table("nuevaBD_tfse_R_reord_names.csv", header=TRUE, sep=";") #IMP.: si volvemos a hacer los análisis con "nuevaBD_tfse_R_reord", tenemos que quitar [,2:30] del script (eso lo usabamos para quitar del análisis la columna con el nombre de los municipios).
+variables_shp<-readOGR("C:/Users/swenj/academiccloudsync/MoveNsense/GIS/SES Archetypes/var_urban.shp") #IMP.: si volvemos a hacer los análisis con "nuevaBD_tfse_R_reord", tenemos que quitar [,2:30] del script (eso lo usabamos para quitar del análisis la columna con el nombre de los municipios).
+variables <- as.data.frame(variables_shp@data)
+readOGR("data.gdb", layer="population")
 
-str(variablesTFSE)
-dim(variablesTFSE)
-summary(variablesTFSE)
-colnames(variablesTFSE)
+str(variables)
+dim(variables)
+summary(variables)
+colnames(variables)
+
+# Some more calculations
 
 ########
-######## ÉSTE ES EL ANÁLISIS QUE HACÍAMOS EN ECOINFORMÁTICA
+######## Ecoinformatics Analysis ######
 ########
 
 
 #Instalación librería para el análisis de correlación VIF (es el que nos enseñaron en Ecoinformática, que había que hacerlo sucesivamente a medida que íbamos eliminando las variables más correlacionadas).
-#install.packages("HH", dep=TRUE)
+install.packages("HH", dep=TRUE)
 
 #Cargamos librería
 library(HH)
 
-#todas las variables con valores VIF menores que 5 pueden seleccionarse
-vif(variablesTFSE)
+#selecting variables with VIF < 5
+vif(variables)
 
 
 
@@ -40,29 +44,30 @@ vif(variablesTFSE)
 #install.packages("devtools", dep=TRUE)
 library(devtools)
 #install_github("taiyun/corrplot", build_vignettes = TRUE)
+install.packages("corrplot")
 library(corrplot)
 
-variables.correlacion <- cor(variablesTFSE[,2:30], method= "pearson", use= "complete.obs")
+variables.correlacion <- cor(variables[,3:32], method= "pearson", use= "complete.obs")
 str(variables.correlacion)
 
 ##Ahora hacemos la matriz de correlación.
-p.mat <- cor.mtest(variablesTFSE[,2:30])$p #Con este objeto luego podemos eliminar en la matriz los no significativos
-corrplot(variables.correlacion, diag = FALSE, tl.pos = "td", tl.cex = 0.5, method = "circle", type = "upper", tl.col = "black", order = "original", p.mat = NULL, sig.level = 0.01, insig = "blank", main= "Matriz de correlación_variables TFSE")
+p.mat <- cor.mtest(variables[,3:32])$p #to remove non-significant elements from matrix
+corrplot(variables.correlacion, diag = FALSE, tl.pos = "td", tl.cex = 0.5, method = "circle", type = "upper", tl.col = "black", order = "original", p.mat = NULL, sig.level = 0.01, insig = "blank", main= "Correlation Matrix")
 corrplot(variables.correlacion, diag = FALSE, tl.pos = "td", tl.cex = 0.5, method = "circle", type = "upper", tl.col = "black", order = "original", p.mat = p.mat, sig.level = 0.01, insig = "blank") #En este se eliminan las correlaciones no significativas. , main= "Matriz de correlación_variables TFSE_(pvalor0.01)"
 #(tenemos que buscar la forma de optimizar el plot, porque al guardarlo se ve muy pequeño)
 
-write.table(variables.correlacion, "C:/Users/Manu/Google Drive/TESIS/Manu_Tesis_Doctoral/Capitulo_2/analisisR_TFSE/Cluster_nuevaBD/TFSE/10TFSE_manhattan_29var/Final_var_reord/coor_matrix_nuevaBD_reord.csv", quote=T, row.names=T, col.names=T, dec=".", sep=";")
+write.table(variables.correlacion, "./cor_matrix.csv", quote=T, row.names=T, col.names=T, dec=".", sep=";")
 
 
 ##############
-############## A partir de aquí comenzamos con el análisis clúster y con el de componentes principales.
+############## Cluster Analysis
 ##############
 
 #instalamos los paquetes que van a hacernos falta
-#install.packages("vegan", dep=TRUE)
-#install.packages("ade4", dep=TRUE)
-#install.packages("gclus", dep=TRUE)
-#install.packages("labdsv", dep=TRUE)
+install.packages("vegan", dep=TRUE)
+install.packages("ade4", dep=TRUE)
+install.packages("gclus", dep=TRUE)
+install.packages("labdsv", dep=TRUE)
 
 #Cargamos los paquetes
 library(vegan)
@@ -77,7 +82,7 @@ library(labdsv)
 
 
 ####
-####AHORA HACEMOS EL CLÚSTER JERÁRQUICO
+#### Hierarchical Clustering
 ####
 
 ###OPCIÓN 1: CALCULAMOS MATRIZ DE DISTANCIAS CON LA FUNCIÓN "DIST" (con este nos sale el árbol un poco mejor, y los cortes posteriores tienen más sentido)
@@ -85,10 +90,10 @@ library(labdsv)
 
 #ESTANDARIZACIÓN DE LAS VARIABLES
 
-variablesTFSE.est<-scale(variablesTFSE[,2:30])  #https://www.statmethods.net/advstats/cluster.html
+#variablesTFSE.est<-scale(variablesTFSE[,2:30])  #https://www.statmethods.net/advstats/cluster.html
 
 #MATRIZ DE DISTANCIAS ENTRE MUNICIPIOS
-muni.dist<-dist(variablesTFSE.est, method="manhattan")
+muni.dist<-dist(variables, method="manhattan")
 
 #CLUSTER DE VARIABLES SEGÚN LA DISTANCIA (MENOR DISTANCIA = MAYOR CORRELACIÓN)
 muni.cluster<-hclust(muni.dist, method="ward.D") # Análisis jerárquico cluster a partir de matriz de disimilitud
@@ -106,17 +111,17 @@ rect.hclust(muni.cluster, 15, border="grey")
 cut15 <- cutree(muni.cluster, 15) 
 
 #EXPORTAMOS LAS CLASES A TABLA
-municipios<-rownames(variablesTFSE)
+squares<-rownames(variables)
 rownames(as.data.frame(cut15))
 
-municipios_TFSE <- cbind(municipios, cut15)
+squares_bind <- cbind(squares, cut15)
 
-dim(municipios_TFSE)
+dim(squares_bind)
 
 write.table(municipios_TFSE, "C:/Users/Manu/Google Drive/TESIS/Manu_Tesis_Doctoral/Capitulo_2/analisisR_TFSE/cut15_manhattan_29var_nuevaBD.csv", quote=T, row.names=T, col.names=T, dec=".", sep=";")
 
 ##############
-###AHORA PROBAMOS A HACER EL CLÚSTER CON K-MEANS
+### Clustering with k means
 ##############
 
 library(stats)
@@ -125,18 +130,18 @@ library(stats)
 variablesTFSE.est<-scale(variablesTFSE)  #https://www.statmethods.net/advstats/cluster.html
 
 # K-Means Cluster Analysis
-TFSE <- kmeans(na.exclude(variablesTFSE.est), 10) # 10 cluster solution
+TFSE <- kmeans(na.exclude(variables), 10) # 10 cluster solution
 
 # get cluster means 
-aggregate(na.exclude(variablesTFSE.est),by=list(TFSE$cluster),FUN=mean)
+aggregate(na.exclude(variables),by=list(TFSE$cluster),FUN=mean)
 
 #EXPORTAMOS LAS CLASES A TABLA
-municipios<-rownames(variablesTFSE)
+municipios<-rownames(variables)
 rownames(as.data.frame(TFSE$cluster))
 
-municipios_TFSE <- cbind(municipios, TFSE$cluster)
+grid_kmean <- cbind(municipios, TFSE$cluster)
 
-dim(municipios_TFSE)
+dim(grid_kmean)
 
 write.table(municipios_TFSE, "d:/Users/usuario/Google Drive/TESIS/Manu_Tesis_Doctoral/Capitulo_2/analisisR_TFSE/cluster_10TFSE_73var_k-means.csv", quote=T, row.names=T, col.names=T, dec=".", sep=";")
 
@@ -150,20 +155,19 @@ write.table(municipios_TFSE, "d:/Users/usuario/Google Drive/TESIS/Manu_Tesis_Doc
 #Transformación logarítmica (en este tutorial: https://www.r-bloggers.com/computing-and-visualizing-pca-in-r/)
 
 #log transform 
-#log.varTFSE <- log(na.omit(variablesTFSE))
+log.var <- log(na.omit(variables))
 
-#Sin transformación previa, se aplica el PCA directamente al set de variables. Eso sí, estandarizando previamente.
+#Without prior transformation, the PCA is applied directly to the set of variables. However, standardizing beforehand.
 
-###Aplicamos el PCA, importante el argumento "scale=TRUE", para estandarizar las variables, se desataca en ambos tutoriales como altamente recomendable.
-
+###We apply the PCA, important the argument "scale=TRUE", to standardize the variables, it is highlighted in both tutorials as highly recommended.
 #Importante, tenemos que unir primero la columna de clases de TFSE a la tabla "variablesTFSE" para colorear el PCA en función de los grupos. Para ello tenemos que haber hecho el clúster y cortarlo por los grupos primero.
 #Esto sirve a la hora de representar el PCA (no al aplicarlo) para que considere los 8 tipos de TFSE y pinte los puntos (municipios) en función del TFSE que son.También nos sirve para el Árbol de decisión, puesto que necesita saber a que grupo pertenece cada municipio.
 #(dos opciones)
-variablesTFSE_cut15 <- data.frame(variablesTFSE[,2:30], cut15) #Nuevo elemento
+variablesTFSE_cut15 <- data.frame(variables[,3:32], cut15) #Nuevo elemento
 variablesTFSE$cut10 <- cut10 #Añadimos la columna al elemento ya creado
 
 #Importante, para el PCA no tenemos que considerar la columna de los grupos. Utilizamos la función na.exclude para que no tenga en cuenta los "no data".
-PCA.varTFSE <- prcomp(na.exclude(variablesTFSE[,2:30]), center=TRUE, scale. = TRUE)
+PCA.varTFSE <- prcomp(na.exclude(variables[,3:32]), center=TRUE, scale. = TRUE)
 
 ###ANALIZANDO LOS RESULTADOS. INTERPRETACIÓN DEL PCA
 #método print
@@ -189,7 +193,7 @@ loadings<-PCA.varTFSE$rotation #Eigenvectors
 scores<-PCA.varTFSE$x
 corr.var.PC <- t(loadings)*PCA.varTFSE$sdev
 #También mediante (más directo):
-corr.var.PC_2<-cor(scores,na.exclude(variablesTFSE))
+corr.var.PC_2<-cor(scores,na.exclude(variables))
 
 write.table(corr.var.PC, "C:/Users/Manu/Google Drive/TESIS/Manu_Tesis_Doctoral/Capitulo_2/analisisR_TFSE/correlacion_variables_PC.csv", quote=T, row.names=T, col.names=T, dec=".", sep=";")
 
@@ -222,6 +226,7 @@ plot(cumsum(prop_varex), xlab = "Principal Component",
 ###REPRESENTACIÓN GRÁFICA SEGÚN EL SCRIPT DE MARÍA
 
 #install_github('fawda123/ggord')
+install.packages("ggord")
 library(ggord)
 library(ggplot2)
 
@@ -243,8 +248,8 @@ summary(ev)
 #APLICAMOS LOS CRITERIOS DE "KRAISER GUTTMAN" Y "BROKEN STICK MODEL" PARA SELECCIONAR LOS EJES
 
 #Función EVPLOT (*Imp.: en lugar de con el paquete de abajo, la definimos a partir del código de la web: http://www.davidzeleny.net/anadat-r/doku.php/en:numecolr:evplot)
-#install.packages("lmom", dep=TRUE)
-#library(lmom)
+install.packages("lmom", dep=TRUE)
+library(lmom)
 
 evplot <- function(ev)
 {
@@ -278,28 +283,28 @@ ev[ev > mean(ev)] # Selecciona los 14 primeros ejes
 #Esto lo vamos a aplicar para ver cuáles son las variables más importantes en la clasificación de nuestras diferentes categorías de TFSE.
 #Es necesario haber hecho primero el análisis clúster para saber a qué TFSE pertece cada municipio (objeto cut10).
 
-#install.packages("dismo", dep=TRUE)
-#install.packages("plotmo", dep=TRUE)
-#install.packages("randomForest", dep=TRUE)
-#install.packages("party", dep=TRUE)
-#install.packages("tree", dep=TRUE)
+install.packages("dismo", dep=TRUE)
+install.packages("plotmo", dep=TRUE)
+install.packages("randomForest", dep=TRUE)
+install.packages("party", dep=TRUE)
+install.packages("tree", dep=TRUE)
 
 library(dismo)
 library(plotmo)
 library(randomForest)
-#library(party)
+library(party)
 library(tree)
 
 #Dado que nuestros datos tienen diferentes órdenes de magnitud, primero es necesario estandarizar.
 variablesTFSE.est<-scale(variablesTFSE[,2:30])
 
 #Unimos el objeto cut10 (creado en el análisis clúster) a nuestra tabla de variables estandarizada.
-variablesTFSE.est_cut15 <- data.frame(variablesTFSE.est, as.factor(cut15)) #Nuevo elemento. Recordar que lo de as.factor es para que entienda a cut10 como categorías en lugar de un valor numérico más.
+variables_cut15 <- data.frame(variables, as.factor(cut15)) #Nuevo elemento. Recordar que lo de as.factor es para que entienda a cut10 como categorías en lugar de un valor numérico más.
 
 #GENERA LA FORMULA DE REGRESION (Esto es del script de eccoinformática de modelos_distribucion.R)
 #formula.regresion<-as.formula(paste("presencia ~ ", paste(names(resultado.vif), collapse="+"), collapse=""))
 
-formula.regresion<-as.formula(paste("as.factor(cut15) ~ ", paste(names(variablesTFSE[,2:30]), collapse="+"), collapse=""))
+formula.regresion<-as.formula(paste("as.factor(cut15) ~ ", paste(names(variables[,3:32]), collapse="+"), collapse=""))
 formula.regresion #IMPORTANTE: esta fórmula es la que luego pegamos cuando aplicamos la función tree. 
 
 
@@ -310,7 +315,7 @@ help(randomForest)
 
 #AJUSTE DEL MODELO randomForest CON LOS DISTINTOS TFSE
 
-rf.TFSE<-randomForest(formula.regresion, data=variablesTFSE.est_cut15, importance=TRUE, proximity= TRUE, na.action=na.exclude, ntree=2000)#Da error
+rf.TFSE<-randomForest(formula.regresion, data=variables_cut15, importance=TRUE, proximity= TRUE, na.action=na.exclude, ntree=100)#Da error
 
 #NOTA: Los parámetros nodesize y maxnodes
 

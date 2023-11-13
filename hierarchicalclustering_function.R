@@ -17,6 +17,7 @@ install_packages = function(){
     install.packages("NbClust")
     install.packages("fmsb")
     install.packages("RColorBrewer")
+    install.packages("sf")
 }
 load_packages = function(){
     library(HH)
@@ -38,15 +39,16 @@ load_packages = function(){
     library(NbClust)
     library(dplyr)
     library(fmsb)
+    library(sf)
 
 }
 load_data = function(){
-    dir.datos="D:/RStudio"
+    dir.datos="C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/"
     setwd(dir.datos)
 
     #Leemos tabla de variables
-    variables_shp<-readOGR("D:/RStudio/urban_extent_final/data_shp.shp") #IMP.: si volvemos a hacer los análisis con "nuevaBD_tfse_R_reord", tenemos que quitar [,2:30] del script (eso lo usabamos para quitar del análisis la columna con el nombre de los municipios).
-    variables <- as.data.frame(variables_shp@data)
+    variables<-read_sf("./RStudio/urban_extent_final/data_shp.shp") #IMP.: si volvemos a hacer los análisis con "nuevaBD_tfse_R_reord", tenemos que quitar [,2:30] del script (eso lo usabamos para quitar del análisis la columna con el nombre de los municipios).
+    variables<-as.data.frame(variables)
     return(variables)
     
     str(variables)
@@ -60,11 +62,11 @@ load_data = function(){
 
 plot_corr = function(variables_cor){
 
-    variables.correlacion <- cor(variables_cor[,2:length(variables_cor)], method= "pearson", use= "complete.obs")
+    variables.correlacion <- cor(variables_cor[,2:length(variables_cor)-1], method= "pearson", use= "complete.obs")
     str(variables.correlacion)
 
     # Correlatiom matrix
-    p.mat <- cor.mtest(variables_cor[,2:length(variables_cor)])$p #to remove non-significant elements from matrix
+    p.mat <- cor.mtest(variables_cor[,2:length(variables_cor)-1])$p #to remove non-significant elements from matrix
     corrplot(variables.correlacion, diag = FALSE, tl.pos = "td", tl.cex = 0.5, method = "circle", type = "upper", tl.col = "black", order = "original", p.mat = NULL, sig.level = 0.01, insig = "blank", main= "Correlation Matrix")
    # corrplot(variables.correlacion, diag = FALSE, tl.pos = "td", tl.cex = 0.5, method = "circle", type = "upper", tl.col = "black", order = "original", p.mat = p.mat, sig.level = 0.01, insig = "blank") #Eliminate non-significant correlations
 
@@ -80,7 +82,7 @@ plot_corr = function(variables_cor){
 
 hierarchical_clusters = function(variables_hrc, method_dist, method_clust, cutoff){
     #Distance Matrix
-    distances<-dist(variables_hrc[,2:length(variables_hrc)], method=method_dist)
+    distances<-dist(variables_hrc[,3:length(variables_hrc)-1], method=method_dist)
     
     #Cluster based on distances (Minor distance = Major Correlation)
     cluster<-hclust(distances, method=method_clust) # An�lisis jer�rquico cluster a partir de matriz de disimilitud
@@ -114,7 +116,7 @@ random_forest = function(variables_rf, cut){
 
     #Regression Model
     #formula.regresion<-as.formula(paste("presencia ~ ", paste(names(resultado.vif), collapse="+"), collapse=""))
-    formula.regresion<-as.formula(paste("as.factor(cut) ~ ", paste(names(variables_rf[,2:length(variables_rf)]), collapse="+"), collapse=""))
+    formula.regresion<-as.formula(paste("as.factor(cut) ~ ", paste(names(variables_rf[,2:length(variables_rf)-1]), collapse="+"), collapse=""))
 
     #RANDOM FORESTS
 
@@ -163,6 +165,8 @@ means_clusters = function(var_df, results){
   df <- as.data.frame(results)
   df$ID_1 <- var_df$ID_1
   
+  var_df <- var_df[, 1:length(var_df)-1]
+  
   var_bind <- cbind(var_df, df, by="ID_1")
   x <- length(var_bind) - 2
   var_bind <- var_bind %>% dplyr::select(1:x)
@@ -186,12 +190,11 @@ means_clusters = function(var_df, results){
   names(slices)[names(slices) == 'ID_1'] <- 'cluster'
   
   return(slices)
-  
-}
+  }
 means_columns = function(var_df){
 
   names <- colnames(var_df)
-  names <- names[c(2:length(names))]
+  names <- names[c(2:length(names)-1)]
   
   means = data.frame(matrix(nrow = 1, ncol = length(names))) 
   names(means) <- names
@@ -207,6 +210,8 @@ means_table = function(vars_df, cluster_results){
   clustmeans <- means_clusters(vars_df, cluster_results)
   colmeans <- means_columns(vars_df)
   colmeans$cluster = 0
+  
+  return(colmeans)
   
   means_bind <- rbind(colmeans, clustmeans)
   means_difference <- means_bind
@@ -447,9 +452,9 @@ variables_urban_4 <- load_data()
 
 distance_method <- "manhattan"
 cluster_method <- "ward.D"
-vars_shp <- readOGR("./urban_extent_final/data_shp.shp")
 
 hca_final_7 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 7)
+rf <- random_forest(variables_urban_4, hca_final_7[[1]])
 shp7 <- export_shp(hca_final_7[[4]], "hca_manhattan_7", vars_shp)
 
 hca_final_8 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 8)

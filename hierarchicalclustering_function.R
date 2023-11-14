@@ -556,20 +556,31 @@ table_sd_values <- function(vars, means){
 
 
 plot <- vars_shp[2:32]
+names <- names(vars_shp)
 plot(plot, key.pos = 4)
 
-### old plotting
+## plotitng (BUGGED)
 
-for (i in 2:31){
-  png(paste(filename="./plots_new/", i, ".png"))
-  print(spplot(vars_shp, zcol=i, main=names[[i-1]]))
-  dev.off()
+png(paste(filename="./Daten/plots_new/2.png"))
+par(mfrow = c(2,5))
+names <- names(vars_shp)
+
+names <- as.name(names)
+name = names[1]
+for (name in names){
+  print(name)
+  x = as.name("pop_yng")
+  map <- ggplot() + 
+    geom_sf(data = vars_shp, aes(fill=name)) +
+    coord_sf(datum = NA)
+  map
 }
+dev.off()
+
+map
 
 
-
-
-
+plot(vars_shp["pop_yng"])
 
 
 

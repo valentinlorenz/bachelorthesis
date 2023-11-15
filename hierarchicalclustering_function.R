@@ -524,18 +524,20 @@ table_sd <- function(means){
   # for every variable 
   for (j in 1:30){
     # calculate standard deviation
-    sd <- sd(means[2:8,][[j]])
-    print(sd)
+    sd <- sd(means[2:nrow(means),][[j]])
     
-    for (k in 1:8){
+    for (k in 1:nrow(means)){
       if (means[k,j] < 0) {
-        if(means[k,j] <= means[1, j] + sd*-1.5){
-          results[k,j] <- "---"
+        if(means[k,j] <= means[1, j] + sd*-2){
+          results[k,j] <- "----"
         }
         else if(means[k,j] <= means[1, j] + sd*-1){
-          results[k,j] <- "--"
+          results[k,j] <- "---"
         }
         else if(means[k,j] <= means[1, j] + sd*-0.5){
+          results[k,j] <- "--"
+        }
+        else if(means[k,j] <= means[1, j] + sd*-0.25){
           results[k,j] <- "-"
         }
         else {
@@ -543,13 +545,16 @@ table_sd <- function(means){
         }
       }
       else if (means[k,j] > 0){
-        if(means[k,j] >= means[1, j] + means[1, j] + sd*1.5){
+        if(means[k,j] >= means[1, j] + means[1, j] + sd*2){
+          results[k,j] <- "++++"
+        }
+        else if(means[k,j] >= means[1, j] + means[1, j] + sd*1){
           results[k,j] <- "+++"
         }
-        else if(means[k,j] >= means[1, j] + sd*1){
+        else if(means[k,j] >= means[1, j] + sd*0.5){
           results[k,j] <- "++"
         }
-        else if(means[k,j] >= means[1, j] + sd*0.5){
+        else if(means[k,j] >= means[1, j] + sd*0.25){
           results[k,j] <- "+"
         }
         else {

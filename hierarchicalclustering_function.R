@@ -528,16 +528,16 @@ table_sd <- function(means){
     
     for (k in 1:nrow(means)){
       if (means[k,j] < 0) {
-        if(means[k,j] <= means[1, j] + sd*-2){
+        if(means[k,j] <= sd*-2){
           results[k,j] <- "----"
         }
-        else if(means[k,j] <= means[1, j] + sd*-1){
+        else if(means[k,j] <= sd*-1){
           results[k,j] <- "---"
         }
-        else if(means[k,j] <= means[1, j] + sd*-0.5){
+        else if(means[k,j] <= sd*-0.5){
           results[k,j] <- "--"
         }
-        else if(means[k,j] <= means[1, j] + sd*-0.25){
+        else if(means[k,j] <= sd*-0.25){
           results[k,j] <- "-"
         }
         else {
@@ -545,16 +545,16 @@ table_sd <- function(means){
         }
       }
       else if (means[k,j] > 0){
-        if(means[k,j] >= means[1, j] + means[1, j] + sd*2){
+        if(means[k,j] >= sd*2){
           results[k,j] <- "++++"
         }
-        else if(means[k,j] >= means[1, j] + means[1, j] + sd*1){
+        else if(means[k,j] >= sd*1){
           results[k,j] <- "+++"
         }
-        else if(means[k,j] >= means[1, j] + sd*0.5){
+        else if(means[k,j] >= sd*0.5){
           results[k,j] <- "++"
         }
-        else if(means[k,j] >= means[1, j] + sd*0.25){
+        else if(means[k,j] >= sd*0.25){
           results[k,j] <- "+"
         }
         else {

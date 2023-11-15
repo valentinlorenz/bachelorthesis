@@ -161,27 +161,39 @@ remove_variable = function(variables_all, var_name, dist_meth, clust_meth, clust
 
 means_clusters = function(var_df, results){
   
+  # add ID column to results for merging
   df <- as.data.frame(results)
   df$ID_1 <- var_df$ID_1
   
+  # bind results to original data
   var_bind <- cbind(var_df, df, by="ID_1")
+  
+  # remove final two columns (contain information on merging process; not relevant for further analysis)
   x <- length(var_bind) - 2
   var_bind <- var_bind %>% dplyr::select(1:x)
   
+  # create list with all variable names
   names <- colnames(var_df)
   names <- names[c(2:length(names))]
   
+  # create new dataframe to mutate
   means <- var_bind
   
+  # group data by cluster (column: results)
+  # calculate mean for every group and every variable
+  # replaces original values
   for (col in names){
     means <- means %>% 
       group_by(results) %>%
       mutate(!!col := mean(!!rlang::sym(col)))
   }
   
+  # create new dataframe with means for every cluster
+  #(adds first entry for every cluster to new dataframe)
   slices <- means %>%
     slice(1)
   
+  # replace first column (ID_1) with cluster column
   slices$ID_1 <- slices$results
   slices <- slices[1:length(slices)-1]
   names(slices)[names(slices) == 'ID_1'] <- 'cluster'
@@ -191,11 +203,16 @@ means_clusters = function(var_df, results){
 }
 means_columns = function(var_df){
 
+  # create list with names of all variables
   names <- colnames(var_df)
   names <- names[c(2:length(names))]
   
+  # create empty dataframe with one row, 30 columns
   means = data.frame(matrix(nrow = 1, ncol = length(names))) 
   names(means) <- names
+  
+  # convert var_df from tibble to dataframe
+  var_df <- as.data.frame(var_df)
   
   for (i in 1:length(names)){
     means[, i] = mean(var_df[, i + 1])
@@ -205,13 +222,17 @@ means_columns = function(var_df){
 }
 means_table = function(vars_df, cluster_results, cluster_n){
   
+  # calculate mean values for every cluster
   clustmeans <- means_clusters(vars_df, cluster_results)
-  colmeans <- means_columns(vars_df)
+  # calculate mean value of clusters
+  colmeans <- means_columns(clustmeans)
   colmeans$cluster = 0
   
+  # combine means
   means_bind <- rbind(colmeans, clustmeans)
   means_difference <- means_bind
   
+  # calculate difference from mean for every cluster
   for (i in 2:cluster_n + 1){
     means_difference[i,] <- means_difference[i,] - means_difference[1,]
   }
@@ -236,8 +257,6 @@ export_shp = function(hra_results, filename, shapefile, filepath){
   
   return(shp)
 }
-
-export_shp(hra_results, filename, shapefile, filepath)
 
 #### LOAD DATA ####
 

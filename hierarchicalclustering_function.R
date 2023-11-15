@@ -121,7 +121,7 @@ random_forest = function(variables_rf, cut){
 
     #AJUSTE DEL MODELO randomForest CON LOS DISTINTOS TFSE
 
-    rf<-randomForest(formula.regresion, data=variables_cut, nodesize=1, importance=TRUE, proximity= TRUE, ntree=1000)#Da error
+    rf<-randomForest(formula.regresion, data=variables_cut, nodesize=1, importance=TRUE, proximity= TRUE, ntree=1000, na.action=na.exclude)#Da error
 
     #NOTA: Los par�metros nodesize y maxnodes
 
@@ -242,18 +242,13 @@ means_table = function(vars_df, cluster_results, cluster_n){
 
 export_shp = function(hra_results, filename, shapefile, filepath){
   
-  hra_results = hca_final_7[[4]]
-  filename = "test_shp"
-  shapefile = vars_shp
-  filepath = "."
-  
   df <- as.data.frame(hra_results)
   df$ID_1 <- shapefile$ID_1
   
   shp <- cbind(shapefile, df, by="ID")
   shp <- shp[ , -which(names(shp) %in% c("by","ID_1.1"))]
   
-  st_write(obj=shp, dsn=filepath, layer=filename, driver="ESRI Shapefile", overwrite=TRUE)
+  st_write(obj=shp, dsn=filepath, layer=filename, driver="ESRI Shapefile", append=FALSE)
   
   return(shp)
 }
@@ -471,7 +466,24 @@ export_shp(hca_10[[4]], "testclustern_10", vars_clip_urban_shp)
 
 #### Final Extent ####
 variables_urban_4 <- load_data()
-variables_urban_4 <- variables_urban_4[1:31]
+variables_urban_4 <- as.data.frame(variables_urban_4[1:31])
+
+# rescale data
+for (i in 2:ncol(variables_urban_4)){
+  variables_urban_4[,i] <- rescale(variables_urban_4[,i], range(0,1))
+}
+
+# replace NA (0) values with mean
+variables_urban_4$ph[which(variables_urban_4$ph == 0)] <- NA
+variables_urban_4$ph[is.na(variables_urban_4$ph)] <- mean(variables_urban_4$ph, na.rm=TRUE)
+
+variables_urban_4$carbon[which(variables_urban_4$carbon == 0)] <- NA
+variables_urban_4$carbon[is.na(variables_urban_4$carbon)] <- mean(variables_urban_4$carbon, na.rm=TRUE)
+
+# rescale data again
+for (i in 2:ncol(variables_urban_4)){
+  variables_urban_4[,i] <- rescale(variables_urban_4[,i], range(0,1))
+}
 
 distance_method <- "manhattan"
 cluster_method <- "ward.D"
@@ -479,37 +491,40 @@ vars_shp <- read_sf("./RStudio/urban_extent_final/data_shp.shp")
 
 hca_final_7 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 7)
 rf <- random_forest(variables_urban_4, hca_final_7[[1]])
-shp7 <- export_shp(hca_final_7[[4]], "hca_manhattan_7", vars_shp)
+shp7 <- export_shp(hca_final_7[[4]], "hca_manhattan_7", vars_shp, "./Daten/plots_new")
 
 hca_final_8 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 8)
-shp8 <- export_shp(hca_final_8[[4]], "hca_manhattan_8", vars_shp)
+shp8 <- export_shp(hca_final_8[[4]], "hca_manhattan_8", vars_shp, "./Daten/plots_new")
 
 hca_final_9 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 9)
-shp9 <- export_shp(hca_final_9[[4]], "hca_manhattan_9", vars_shp)
+shp9 <- export_shp(hca_final_9[[4]], "hca_manhattan_9", vars_shp, "./Daten/plots_new")
+
+plot(shp7["hra_results"], pal = brewer.pal(7, "Set3"), main="7 Clusters", key.pos = 1)
+plot(shp8["hra_results"], pal = brewer.pal(8, "Set3"), main="8 Clusters", key.pos = 1)
+plot(shp9["hra_results"], pal = brewer.pal(9, "Set3"), main="9 Clusters", key.pos = 1)
 
 means_7 <- means_table(variables_urban_4, hca_final_7[[1]], 7)
 means_8 <- means_table(variables_urban_4, hca_final_8[[1]], 8)
 means_9 <- means_table(variables_urban_4, hca_final_9[[1]], 9)
 
+table_sd_7 <- table_sd(means_7)
+table_sd_8 <- table_sd(means_8)
+table_sd_9 <- table_sd(means_9)
 
-spplot(shp7, n = 7, col.regions = brewer.pal(n=7, name="Set1"), cuts = 6, 'hra_results', main="Clusters: 7", col="transparent")
-spplot(shp8, n = 8, col.regions = brewer.pal(n=8, name="Set1"), cuts = 7, 'hra_results', main="Clusters: 8", col="transparent")
-spplot(shp9, n = 9, col.regions = brewer.pal(n=9, name="Set1"), cuts = 8, 'hra_results', main="Clusters: 9", col="transparent")
+write.csv(table_sd_7, "./Daten/tables/table7.csv", row.names=FALSE)
+write.csv(table_sd_8, "./Daten/tables/table8.csv", row.names=FALSE)
+write.csv(table_sd_9, "./Daten/tables/table9.csv", row.names=FALSE)
 
-table_sd_7 <- table_sd(variables_urban_4, means_7)
-table_sd_8 <- table_sd(variables_urban_4, means_8)
-table_sd_9 <- table_sd(variables_urban_4, means_9)
-
-table_sd <- function(vars, means){
+table_sd <- function(means){
   results <- data.frame(matrix(ncol = ncol(means), nrow=nrow(means)))
-  colnames(results) <- names(means)
+  colnames(results) <- colnames(means)
   results$cluster <- means$cluster
   
   
   # for every variable 
   for (j in 1:30){
-    # calculate standard deviation 
-    sd <- sd(vars[[j+1]])
+    # calculate standard deviation
+    sd <- sd(means[2:8,][[j]])
     print(sd)
     
     for (k in 1:8){
@@ -551,25 +566,8 @@ table_sd <- function(vars, means){
   
   return(results)
 }
-table_sd_values <- function(vars, means){
-  results <- data.frame(matrix(ncol = ncol(means), nrow=nrow(means)))
-  colnames(results) <- names(means)
-  results$cluster <- means$cluster
   
-  
-  # for every variable 
-  for (j in 1:30){
-    # calculate standard deviation 
-    sd <- sd(vars[[j+1]])
-    print(sd)
-    
-    for (k in 2:8){
-      results[k, j] <- (means[k, j]-means[1, j]/sd)
-    }
-  }
-  
-  return(results)
-}
+
 
 #### plot data ####
 

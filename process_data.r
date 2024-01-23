@@ -47,57 +47,148 @@ shapes <- readOGR("data.gdb", layer="ID")
 
 ID <- seq(from=1, to=33783)
 
-# CALCULATE DATA
+
+#### DATA PRE-PROCESSING ####
+
+# ph: replace value 0 with N/A
+ph$grid_code[which(ph$grid_code == 0)] <- NA
+
+# carbon: replace value 0 with N/A
+carbon$grid_code[which(carbon$grid_code == 0)] <- NA
+
+# old population: calculate ratio of overall population to people > 64
 
 pop_old_perc <- as.data.frame(ID)
-pop_old_perc$pop_old <- (pop_old$grid_code / pop_dens$grid_code)
-pop_old_perc[is.na(pop_old_perc)] <- 0
+pop_old_perc$grid_code <- (pop_old$grid_code / pop_dens$grid_code)
+
+# young population: - " - 
 
 pop_young_perc <- as.data.frame(ID)
-pop_young_perc$pop_young <- (pop_young$grid_code / pop_dens$grid_code)
-pop_young_perc[is.na(pop_young_perc)] <- 0 
-# PROCESSING
+pop_young_perc$grid_code <- (pop_young$grid_code / pop_dens$grid_code)
+
+
+#### Combine data into same dataframe 
 
 vars <- list(pop_young_perc, pop_old_perc, pop_dens, quiet, build_count, build_perc, single_fam, prot_areas, open_veg, closed_veg, rec_green, unsealed, roads, bus, culture, supply, public, ph, carbon, rightwing, leftwing, participation, realestate, elevation, slope, river_dist, ndvi_mean, ndvi_sd, ndvi_max, biodiversity)
-vars_names <- list('pop_young', 'pop_old', 'pop_dens', 'quiet', 'build_count', 'build_perc', 'single_fam', 'prot_areas', 'open_veg', 'closed_veg', 'rec_green', 'unsealed', 'roads', 'bus', 'culture', 'supply', 'public', 'ph', 'carbon', 'rightwing', 'leftwing', 'participation', 'realestate', 'elevation', 'slope', 'river_dist', 'ndvi_mean', 'ndvi_sd', 'ndvi_max', 'biodiversity')
+vars_names <- list('pop_yng', 'pop_old', 'pop_dens', 'quiet', 'buildings', 'build_per', 'single_fam', 'protected', 'open_veg', 'treecover', 'rec_green', 'unsealed', 'roads', 'bus_dist', 'culture', 'supply', 'public', 'ph', 'carbon', 'right', 'left', 'particip', 'realest', 'elevation', 'slope', 'river_dist', 'ndvi_mean', 'ndvi_sd', 'ndvi_max', 'biodiverse')
 
-# Reduce columns
-for (i in seq(from=3, to=30)){
+# Reduce columns to two: ID & grid_code
+for (i in seq(from=1, to=30)){
   vars[[i]]$ID <- ID
   vars[[i]] <- vars[[i]][c('grid_code', 'ID')]
 }
 
 #Rename columns
-
-for (k in seq(from=3, to=30)){
-  names(vars[[k]]@data) <- c(vars_names[[k]], 'ID')
+for (k in seq(from=1, to=30)){
+  names(vars[[k]]) <- c(vars_names[[k]], 'ID')
 }
 
-# merge dataframes 
+### merge dataframes 
 
 variables_df <- as.data.frame(ID)
 
-for (j in seq(from=2, to=30)){
+# convert all data to dataframes
+for (j in seq(from=1, to=30)){
   vars[[j]] <- as.data.frame(vars[[j]])
 }
 
+# merge data
 for (var in vars){
-  variables_df <- merge(x = variables_df, y = var)
+  variables_df <- merge(x = variables_df, y = var, by="ID")
+}
+
+# remove geometry columns
+
+variables_df <- variables_df[, which(names(variables_df) %in% vars_names)]
+
+
+#### MORE DATA PROCESSING ####
+
+# single family housing: replace values in area with 0 houses with NA
+variables_df$single_fam <- single_fam$grid_code
+variables_df$single_fam[which(variables_df$buildings == 0 & variables_df$build_per == 0)] <- NA
+
+
+#### PLOT DATA ####
+
+par(mfrow = c(5, 6))
+for (var in variables_df){
+  hist(var)
+}
+
+#### EXPORT DATA AS SHAPEFILE ####
+
+geometry_df <- as.data.frame(ID)
+geometry_df$geometry <- biodiversity$geometry
+combined <- cbind(geometry_df, variables_df, by="ID")
+combined <- combined[1:32]
+
+combined <- st_as_sf(combined)
+plot(combined)
+
+st_write(combined, dsn="D:/data/processed_data/", layer="alldata_nolog", driver="ESRI Shapefile")
+
+#### Import cropped file ####
+
+data <- st_read("D:/data/processed_data/finalextent_nolog.gpkg")
+
+# plot
+
+par(mfrow = c(5, 6))
+data <- as.data.frame(data)
+for (var in data[2:31]){
+  hist(var)
+}
+
+# log transform 
+
+data_log <- data
+
+for (i in 2:ncol(data_log)-1){
+  data_log[,i] <- data_log[, i] + 1
+}
+
+for (var in data_log[2:31]-1){
+  hist(var)
 }
 
 # RESCALE DATA
 
-for (i in 2:ncol(variables_df)){
-  variables_df[,i] <- rescale(variables_df[,i], to=c(0,1))
+for (i in 3:ncol(data_log)-1){
+  data_log[,i] <- rescale(data_log[,i], to=c(0,1))
 }
 
-write.csv(variables_df, file="variables_urban.csv")
 
-# CREATE PLOTTABLE 
 
-shapes@data$ID <- ID
+st_write(data_log, dsn="D:/data/processed_data/", layer="finalextent_log", driver="ESRI Shapefile")
 
-combined <- cbind(shapes, variables_df, by="ID")
-combined <- combined[1:length(combined@data)-1]
+# READ DATA TO REPLACE OSM POI VALUES
 
-writeOGR(obj=combined, dsn="./data_scaled_final.shp", layer="combined", driver="ESRI Shapefile")
+data <- st_read("D:/data/processed_data/finalextent_log.shp")
+culture <- st_read("C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/data/culture_distance_clip.shp")
+supply <- st_read("C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/data/supply_distance_clip.shp")
+public <- st_read("C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/data/public_distance_clip.shp")
+
+# replace old values
+
+data$culture <- culture$grid_code
+data$supply <- supply$grid_code
+data$public <- public$grid_code
+
+# log + scale new data
+data <- as.data.frame(data)
+for (i in 16:18){
+  data[, i] <- data[, i] + 1
+}
+for (i in 16:18){
+  data[,i] <- rescale(data[,i], to=c(0,1))
+}
+
+# remove data that is too homogeneous / unreliable
+
+data <- data[, -which(names(data) %in% c("pop_dens", "pop_old", "pop_yng", "quiet", "biodiverse", "slope"))]
+
+
+st_write(data, dsn="D:/data/processed_data/", layer="final_data", driver="ESRI Shapefile")
+
+

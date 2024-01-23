@@ -1,4 +1,6 @@
-#### Load Data ####
+######## FUNCTIONS ########
+
+#### Load Data and Packages ####
 
 install_packages = function(){
     install.packages("HH", dep=TRUE)
@@ -56,7 +58,7 @@ load_data = function(){
     colnames(variables)
 }
 
-# Corrplot
+#### Correlation ####
 # https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
 
 plot_corr = function(variables_cor){
@@ -134,7 +136,7 @@ random_forest = function(variables_rf, cut){
 
     #CURVAS DE RESPUESTA
     #con plotmo
-    plotmo(rf)
+    #plotmo(rf)
 
     #con partialPlot (variable a variable)
    # partialPlot(rf, x.var=SEC_10, pred.data=variables_cut)
@@ -159,14 +161,16 @@ remove_variable = function(variables_all, var_name, dist_meth, clust_meth, clust
   
 }
 
+#### Calculate Standard Deviation from Mean ####
 means_clusters = function(var_df, results){
+
   
   # add ID column to results for merging
   df <- as.data.frame(results)
-  df$ID_1 <- var_df$ID_1
+  df$ID <- var_df$ID
   
   # bind results to original data
-  var_bind <- cbind(var_df, df, by="ID_1")
+  var_bind <- cbind(var_df, df, by="ID")
   
   # remove final two columns (contain information on merging process; not relevant for further analysis)
   x <- length(var_bind) - 2
@@ -185,8 +189,9 @@ means_clusters = function(var_df, results){
   for (col in names){
     means <- means %>% 
       group_by(results) %>%
-      mutate(!!col := mean(!!rlang::sym(col)))
+      mutate(!!col := mean(!!rlang::sym(col), na.rm = TRUE))
   }
+  
   
   # create new dataframe with means for every cluster
   #(adds first entry for every cluster to new dataframe)
@@ -194,9 +199,9 @@ means_clusters = function(var_df, results){
     slice(1)
   
   # replace first column (ID_1) with cluster column
-  slices$ID_1 <- slices$results
+  slices$ID <- slices$results
   slices <- slices[1:length(slices)-1]
-  names(slices)[names(slices) == 'ID_1'] <- 'cluster'
+  names(slices)[names(slices) == 'ID'] <- 'cluster'
   
   return(slices)
   
@@ -215,7 +220,8 @@ means_columns = function(var_df){
   var_df <- as.data.frame(var_df)
   
   for (i in 1:length(names)){
-    means[, i] = mean(var_df[, i + 1])
+    k = i + 1
+    means[, i] <- mean(var_df[, i + 1])
   }
   
   return(means)
@@ -240,6 +246,70 @@ means_table = function(vars_df, cluster_results, cluster_n){
   return(means_difference)
 }
 
+table_sd <- function(means){
+  # create new empty dataframe with cluster numbers
+  results <- data.frame(matrix(ncol = ncol(means), nrow=nrow(means)))
+  colnames(results) <- colnames(means)
+  results$cluster <- means$cluster
+  
+  
+  # for every variable 
+  for (j in 1:(ncol(means8)-1)){
+    # calculate standard deviation
+    sd <- sd(means[2:nrow(means),][[j]])
+    
+    # check how many standard deviations values are removed from the mean
+    for (k in 1:nrow(means)){
+      # - for negative deviation
+      if (means[k,j] < 0) {
+        if(means[k,j] <= sd*-2){
+          results[k,j] <- "----"
+        }
+        else if(means[k,j] <= sd*-1.5){
+          results[k,j] <- "---"
+        }
+        else if(means[k,j] <= sd*-1){
+          results[k,j] <- "--"
+        }
+        else if(means[k,j] <= sd*-0.5){
+          results[k,j] <- "-"
+        }
+        else {
+          results[k,j] <- " "
+        }
+      }
+      # + for positive deviation
+      else if (means[k,j] > 0){
+        if(means[k,j] >= sd*2){
+          results[k,j] <- "++++"
+        }
+        else if(means[k,j] >= sd*1.5){
+          results[k,j] <- "+++"
+        }
+        else if(means[k,j] >= sd*1){
+          results[k,j] <- "++"
+        }
+        else if(means[k,j] >= sd*0.5){
+          results[k,j] <- "+"
+        }
+        
+        else {
+          results[k,j] <- " "
+        }
+      }
+      else {
+        results[k,j] <- " "
+      }
+    }
+    
+    
+  }
+  
+  return(results)
+}
+
+
+#### Export Data ####
 export_shp = function(hra_results, filename, shapefile, filepath){
   
   df <- as.data.frame(hra_results)
@@ -252,6 +322,12 @@ export_shp = function(hra_results, filename, shapefile, filepath){
   
   return(shp)
 }
+
+
+
+
+
+######## ANALYSIS #########
 
 #### LOAD DATA ####
 
@@ -497,11 +573,14 @@ hca_final_8 <- hierarchical_clusters(variables_urban_4, distance_method, cluster
 shp8 <- export_shp(hca_final_8[[4]], "hca_manhattan_8", vars_shp, "./Daten/plots_new")
 
 hca_final_9 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 9)
+
+
 shp9 <- export_shp(hca_final_9[[4]], "hca_manhattan_9", vars_shp, "./Daten/plots_new")
 
-plot(shp7["hra_results"], pal = brewer.pal(7, "Set3"), main="7 Clusters", key.pos = 1)
-plot(shp8["hra_results"], pal = brewer.pal(8, "Set3"), main="8 Clusters", key.pos = 1)
-plot(shp9["hra_results"], pal = brewer.pal(9, "Set3"), main="9 Clusters", key.pos = 1)
+
+plot(shp7["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred", "lightskyblue2", "darkorange", "palegreen3"), main="7 Clusters", key.pos = 1)
+plot(shp8["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred", "lightskyblue2", "darkorange", "palegreen3", "cornsilk4"), main="8 Clusters", key.pos = 1)
+plot(shp9["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred", "lightskyblue2", "darkorange", "palegreen3", "cornsilk4","darkcyan"), main="9 Clusters", key.pos = 1)
 
 means_7 <- means_table(variables_urban_4, hca_final_7[[1]], 7)
 means_8 <- means_table(variables_urban_4, hca_final_8[[1]], 8)
@@ -515,64 +594,94 @@ write.csv(table_sd_7, "./Daten/tables/table7.csv", row.names=FALSE)
 write.csv(table_sd_8, "./Daten/tables/table8.csv", row.names=FALSE)
 write.csv(table_sd_9, "./Daten/tables/table9.csv", row.names=FALSE)
 
-table_sd <- function(means){
-  results <- data.frame(matrix(ncol = ncol(means), nrow=nrow(means)))
-  colnames(results) <- colnames(means)
-  results$cluster <- means$cluster
-  
-  
-  # for every variable 
-  for (j in 1:30){
-    # calculate standard deviation
-    sd <- sd(means[2:nrow(means),][[j]])
-    
-    for (k in 1:nrow(means)){
-      if (means[k,j] < 0) {
-        if(means[k,j] <= sd*-2){
-          results[k,j] <- "----"
-        }
-        else if(means[k,j] <= sd*-1){
-          results[k,j] <- "---"
-        }
-        else if(means[k,j] <= sd*-0.5){
-          results[k,j] <- "--"
-        }
-        else if(means[k,j] <= sd*-0.25){
-          results[k,j] <- "-"
-        }
-        else {
-          results[k,j] <- " "
-        }
-      }
-      else if (means[k,j] > 0){
-        if(means[k,j] >= sd*2){
-          results[k,j] <- "++++"
-        }
-        else if(means[k,j] >= sd*1){
-          results[k,j] <- "+++"
-        }
-        else if(means[k,j] >= sd*0.5){
-          results[k,j] <- "++"
-        }
-        else if(means[k,j] >= sd*0.25){
-          results[k,j] <- "+"
-        }
-        else {
-          results[k,j] <- " "
-        }
-      }
-      else {
-        results[k,j] <- " "
-      }
-    }
-    
-    
-  }
-  
-  return(results)
-}
+hca_final_15 <- hierarchical_clusters(variables_urban_4, distance_method, cluster_method, 15)
+shp15 <- export_shp(hca_final_15[[4]], "hca_manhattan_15", vars_shp, "./Daten/plots_new")
+plot(shp15["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred", "lightskyblue2", "darkorange", "palegreen3", "cornsilk4","darkcyan","blue", "red", "yellow", "darkblue", "darkgreen" ), main="15 Clusters", key.pos = 1)
+
+
+#### REMOVE VARIABLES THAT ARE LESS RELIABLE FOR PL ####
+var_names <- list("pop_yng", "pop_old", "pop_dns", "realstt", "quiet")
+variables_reduced <- variables_urban_4[, -which(names(variables_urban_4) %in% var_names)]
+hca_reduced <- hierarchical_clusters(variables_reduced, distance_method, cluster_method, 9)
+shp_reduced <- export_shp(hca_reduced[[4]], "hca_reduced_variables", vars_shp, "./Daten/plots_new")
+rf <- random_forest(variables_reduced, hca_reduced[[1]])
+plot(shp_reduced["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred", "lightskyblue2", "darkorange", "palegreen3", "cornsilk4","darkcyan"), main="Less robust variables removed", key.pos = 1)
+
+
+
   
 
+
+
+#### IMPROVED VARIABLES: RECLUSTERING ####
+data_log_shp <- st_read("D:/data/processed_data/finalextent_log.shp")
+data_log <- as.data.frame(data_log_shp)
+data_log <- data_log[1:31]
+
+clusters_7_new <- hierarchical_clusters(data_log, distance_method, cluster_method, 7)
+clusters_8_new <- hierarchical_clusters(data_log, distance_method, cluster_method, 8)
+clusters_9_new <- hierarchical_clusters(data_log, distance_method, cluster_method, 9)
+
+rf <- random_forest(data_log, clusters_9_new[[1]])
+
+shp7_new <- export_shp(clusters_7_new[[4]], "clusters_log_7", data_log_shp, "C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/plots_new")
+shp8_new <- export_shp(clusters_8_new[[4]], "clusters_log_8", data_log_shp, "C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/plots_new")
+shp9_new <- export_shp(clusters_9_new[[4]], "clusters_log_9", data_log_shp, "C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/plots_new")
+
+plot(shp7_new["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred", "lightskyblue2", "darkorange", "palegreen3"), main="7 Clusters", key.pos = 1)
+plot(shp8_new["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred","plum1", "lightskyblue2","darkorange", "palegreen3"), main="8 Clusters", key.pos = 1)
+plot(shp9_new["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred","plum1", "lightskyblue2","darkorange","darkgreen", "palegreen3"), main="9 Clusters", key.pos = 1)
+
+means_7_new <- means_table(data_log, clusters_7_new[[1]], 7)
+table_sd_7_new <- table_sd(means_7_new)
+write.csv(table_sd_7_new, "C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/tables/table7_log.csv", row.names=FALSE)
+
+means_8_new <- means_table(data_log, clusters_8_new[[1]], 8)
+table_sd_8_new <- table_sd(means_8_new)
+write.csv(table_sd_8_new, "C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/tables/table8_log.csv", row.names=FALSE)
+
+means_9_new <- means_table(data_log, clusters_9_new[[1]], 9)
+table_sd_9_new <- table_sd(means_9_new)
+write.csv(table_sd_9_new, "C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/tables/table9_log.csv", row.names=FALSE)
+
+
+## plot individual values ##
+
+plot(shp7_new[2:13], max.plot = 12, key.pos = 4)
+plot(shp7_new[14:25], max.plot = 12, key.pos= 4)
+plot(shp7_new[26:31], max.plot = 12, key.pos = 4)
+
+
+## remove variables that are too homogeneous / have a bad resolution ##
+
+data_shp <- data_log_shp[, -which(names(data_log_shp) %in% c("pop_dens", "pop_old", "pop_yng", "quiet", "biodiverse", "slope"))]
+data <- as.data.frame(data_shp)
+data <- data[1:length(data)-1]
+
+clusters8 <- hierarchical_clusters(data, distance_method, cluster_method, 8)
+rf8 <- random_forest(data, clusters8[[1]])
+means8 <- means_table(data, clusters8[[1]], 8)
+table_sd8 <- table_sd(means8)
+write.csv(table_sd8, "C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/tables/table8_wholearea.csv", row.names=FALSE)
+
+shp8 <- export_shp(clusters8[[4]], "clusters8_wholearea", data_shp, "C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/plots_new")
+plot(shp8["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred","plum1", "lightskyblue2","darkorange", "palegreen3"), main="8 Clusters", key.pos = 1)
+
+## recluster cluster 6 + 7 (urban center clusters) ##
+
+data_urban_shp <- shp8[shp8$hra_results == 6 | shp8$hra_results == 7,]
+data_urban_shp <- data_urban_shp[, -c(26)]
+data_urban <- as.data.frame(data_urban_shp)
+data_urban <- data_urban[1:(length(data_urban)-2)]
+
+clusters5_urban <- hierarchical_clusters(data_urban, distance_method, cluster_method, 5)
+rf5_urban <- random_forest(data_urban, clusters5_urban[[1]])
+means5_urban <- means_table(data_urban, clusters5_urban[[1]], 5)
+table_sd5_urban <- table_sd(means5_urban)
+write.csv(table_sd5_urban, "C:/Users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/tables/table5_urbancenter.csv", row.names=FALSE)
+
+shp5_urban <- export_shp(clusters5_urban[[4]], "clusters5_urbancenter", data_urban_shp, "C:/users/quinn/OneDrive/Dokumente/Uni/Bachelorarbeit/Daten/plots_new")
+plot(shp5_urban["hra_results"], pal = c("aquamarine", "cornsilk1", "mediumpurple", "indianred","plum1"), main="City Centre Clusters", key.pos = 1)
 
 #### plot data ####
 
@@ -581,7 +690,7 @@ plot <- vars_shp[2:32]
 names <- names(vars_shp)
 plot(plot, key.pos = 4)
 
-## plotitng (BUGGED)
+## plotting (BUGGED)
 
 png(paste(filename="./Daten/plots_new/2.png"))
 par(mfrow = c(2,5))
